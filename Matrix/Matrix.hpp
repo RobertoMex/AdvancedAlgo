@@ -47,6 +47,12 @@ public:
         }
     };
 
+    Matrix<TScalar, NCols, NRows> transpose()
+    {
+        return Matrix<TScalar, NCols, NRows>([this](std::size_t i, std::size_t j)
+                                             { return mat[j][i]; });
+    }
+
     void print()
     {
         for (auto &row : mat)
@@ -110,14 +116,14 @@ public:
      * @param other The other matrix
      * @param result The result matrix
      */
-    template <int NColsProduct>
+    template <std::size_t NColsProduct>
     void multiplyRight(const Matrix<TScalar, NCols, NColsProduct> &other, Matrix<TScalar, NRows, NColsProduct> &result)
     {
-        for (std::size_t i = 0; i < NRows; ++i)
+        for (std::size_t i = 0; i != NRows; ++i)
         {
-            for (std::size_t k = 0; k < NCols; ++k)
+            for (std::size_t k = 0; k != NCols; ++k)
             {
-                for (std::size_t j = 0; j < NColsProduct; ++j)
+                for (std::size_t j = 0; j != NColsProduct; ++j)
                 {
                     result.mat[i][j] += mat[i][k] * other.mat[k][j];
                 }
@@ -132,14 +138,14 @@ public:
      * @param other The other matrix
      * @param result The result matrix
      */
-    template <int NRowsProduct>
+    template <std::size_t NRowsProduct>
     void multiplyLeft(const Matrix<TScalar, NRowsProduct, NRows> &other, Matrix<TScalar, NRowsProduct, NCols> &result)
     {
-        for (std::size_t i = 0; i < NRowsProduct; ++i)
+        for (std::size_t i = 0; i != NRowsProduct; ++i)
         {
-            for (std::size_t k = 0; k < NRows; ++k)
+            for (std::size_t k = 0; k != NRows; ++k)
             {
-                for (std::size_t j = 0; j < NCols; ++j)
+                for (std::size_t j = 0; j != NCols; ++j)
                 {
                     result.mat[i][j] += other.mat[i][k] * mat[k][j];
                 }
@@ -147,8 +153,42 @@ public:
         }
     };
 
-    // submatrix()
-    // combine()
+    /**
+     * @brief Return a copy of a submatrix of the current matrix. There is no bounds checking.
+     * 
+     * @tparam NRowsSubmatrix The number of rows of the submatrix.
+     * @tparam NColsSubmatrix The number of columns of the submatrix.
+     * @param firstRow The index of the first row of the submatrix: we must have (firstRow + NRowsSubmatrix) less than NRows.
+     * @param firstCol The index of the first column of the submatrix: we must have (firstCol + NColsSubmatrix) less than NCols.
+     * @return Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> A copy of the submatrix.
+     */
+    template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
+    Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> submatrix(std::size_t firstRow, std::size_t firstCol)
+    {
+        return Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix>([this, firstRow, firstCol](std::size_t i, std::size_t j)
+                                                               { return mat[firstRow + i][firstCol + j]; });
+    };
+
+    /**
+     * @brief Overwrite a submatrix of the current matrix with another matrix. There is no bounds checking.
+     * 
+     * @tparam NRowsSubmatrix The number of rows of the submatrix.
+     * @tparam NColsSubmatrix The number of columns of the submatrix.
+     * @param other A matrix containing the new values to write to the submatrix of the current matrix.
+     * @param firstRow The index of the first row of the submatrix: we must have (firstRow + NRowsSubmatrix) less than NRows.
+     * @param firstCol The index of the first column of the submatrix: we must have (firstCol + NColsSubmatrix) less than NCols.
+     */
+    template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
+    void overwriteSubmatrix(const Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> &other, std::size_t firstRow, std::size_t firstCol)
+    {
+        for (std::size_t i = 0; i != NRowsSubmatrix; ++i)
+        {
+            for (std::size_t j = 0; j != NColsSubmatrix; ++j)
+            {
+                mat[firstRow + i][firstCol + j] = other.mat[i][j];
+            }
+        }
+    };
 };
 
 #endif
