@@ -47,13 +47,13 @@ public:
         }
     };
 
-    Matrix<TScalar, NCols, NRows> transpose()
+    Matrix<TScalar, NCols, NRows> transpose() const
     {
         return Matrix<TScalar, NCols, NRows>([this](std::size_t i, std::size_t j)
                                              { return mat[j][i]; });
     }
 
-    void print()
+    void print() const
     {
         for (auto &row : mat)
         {
@@ -71,7 +71,7 @@ public:
      * @param i Row index: 0 <= i < NRows
      * @param j Col index: 0 <= j < NCols
      */
-    TScalar get(std::size_t i, std::size_t j)
+    TScalar get(std::size_t i, std::size_t j) const
     {
         return mat[i][j];
     }
@@ -117,7 +117,7 @@ public:
      * @param result The result matrix
      */
     template <std::size_t NColsProduct>
-    void multiplyRight(const Matrix<TScalar, NCols, NColsProduct> &other, Matrix<TScalar, NRows, NColsProduct> &result)
+    void multiplyRight(const Matrix<TScalar, NCols, NColsProduct> &other, Matrix<TScalar, NRows, NColsProduct> &result) const
     {
         for (std::size_t i = 0; i != NRows; ++i)
         {
@@ -139,7 +139,7 @@ public:
      * @param result The result matrix
      */
     template <std::size_t NRowsProduct>
-    void multiplyLeft(const Matrix<TScalar, NRowsProduct, NRows> &other, Matrix<TScalar, NRowsProduct, NCols> &result)
+    void multiplyLeft(const Matrix<TScalar, NRowsProduct, NRows> &other, Matrix<TScalar, NRowsProduct, NCols> &result) const
     {
         for (std::size_t i = 0; i != NRowsProduct; ++i)
         {
@@ -163,7 +163,7 @@ public:
      * @return Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> A copy of the submatrix.
      */
     template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
-    Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> submatrix(std::size_t firstRow, std::size_t firstCol)
+    Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> submatrix(std::size_t firstRow, std::size_t firstCol) const
     {
         return Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix>([this, firstRow, firstCol](std::size_t i, std::size_t j)
                                                                { return mat[firstRow + i][firstCol + j]; });
