@@ -4,11 +4,11 @@
 
 # Compiler settings - Can be customized.
 CC = g++
-CXXFLAGS = -std=c++11 -Wall
+CXXFLAGS = -std=c++11 -Wall -fopenmp
 LDFLAGS = 
 
 # Makefile settings - Can be customized.
-APPNAME = TestApp1
+APPNAME = matrixPll
 EXT = .cpp
 SRCDIR = src
 OBJDIR = obj
