@@ -5,10 +5,10 @@
 # Compiler settings - Can be customized.
 CC = g++
 CXXFLAGS = -std=c++11 -Wall
-LDFLAGS = 
+LDFLAGS =
 
 # Makefile settings - Can be customized.
-APPNAME = myapp
+APPNAME = braveApp
 EXT = .cpp
 SRCDIR = src
 OBJDIR = obj
