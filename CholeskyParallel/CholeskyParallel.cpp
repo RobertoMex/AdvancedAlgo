@@ -11,7 +11,7 @@
 #include "../Matrix/Matrix.hpp"
 
 template <typename TScalar, std::size_t N>
-void populateCholMat(Matrix<TScalar, N, 1> &column /* mutated!! */, Matrix<TScalar, N, N> &result)
+void populateCholMat(Matrix<TScalar, N, 1> &column /* mutated!! */, Matrix<TScalar, N, N> &result, std::size_t i)
 {
     const TScalar diagElem = std::sqrt(std::abs(column.get(i, 0)));
     column.set(i, 0, diagElem);
@@ -91,7 +91,7 @@ void cholBlockIter(std::size_t blockIndex, Matrix<TScalar, N, NBlock> mat, Messa
         if (populateResultMat)
         {
             column.set(i + firstIdx, 0, diagElem);
-            populateCholMat(column, resultMat);
+            populateCholMat(column, resultMat, i + firstIdx);
         }
     }
 }
@@ -100,7 +100,7 @@ template <typename TScalar, std::size_t N>
 void computeCholeskySequential(const Matrix<TScalar, N, N> &mat, Matrix<TScalar, N, N> &result)
 {
     auto timerStart = std::chrono::steady_clock::now();
-    Client<Matrix<TScalar, N, 1>> client = messageQueue.getClient();
+    MessageQueue<Matrix<TScalar, N, 1>> messageQueue;
     cholBlockIter<TScalar, N, N>(0, mat, messageQueue, true, result);
     auto timerStop = std::chrono::steady_clock::now();
     std::chrono::duration<double> milliseconds = timerStop - timerStart;
@@ -113,7 +113,7 @@ void computeCholeskySequential(const Matrix<TScalar, N, N> &mat, Matrix<TScalar,
     TScalar frobMat = mat.frobNorm();
     TScalar frobFractional = 100.0 * frobResidual / frobMat;
 
-    std::cout << "Parallel Cholesky, N = " << N << ", p = " << p << std::endl;
+    std::cout << "Sequential Cholesky, N = " << std::endl;
     std::cout << "Milliseconds: " << count << std::endl;
     std::cout << "Percent residual (Frobenius): " << frobFractional << std::endl;
     std::cout << "---------------------------" << std::endl;
@@ -135,7 +135,7 @@ void computeCholeskyParallel(const Matrix<TScalar, N, N> &mat, Matrix<TScalar, N
         std::size_t firstCol = i * NBlock;
         Matrix<TScalar, N, NBlock> submatrix;
         mat.columnsInto(firstCol, submatrix);
-        std::thread thread = std::thread(cholBlockIter<TScalar, N, NBlock>, i, submatrix, std::ref(messageQueue), false, result);
+        std::thread thread = std::thread(cholBlockIter<TScalar, N, NBlock>, i, submatrix, std::ref(messageQueue), false, std::ref(result));
         threads.push_back(std::move(thread));
     }
 
@@ -153,7 +153,7 @@ void computeCholeskyParallel(const Matrix<TScalar, N, N> &mat, Matrix<TScalar, N
         }
 
         Matrix<TScalar, N, 1> column = messageQueue.next(client);
-        populateCholMat(column, result);
+        populateCholMat(column, result, i);
     }
 
     auto timerStop = std::chrono::steady_clock::now();
