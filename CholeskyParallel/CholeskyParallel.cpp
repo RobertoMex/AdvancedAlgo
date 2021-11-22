@@ -113,7 +113,7 @@ void computeCholeskySequential(const Matrix<TScalar, N, N> &mat, Matrix<TScalar,
     TScalar frobMat = mat.frobNorm();
     TScalar frobFractional = 100.0 * frobResidual / frobMat;
 
-    std::cout << "Sequential Cholesky, N = " << std::endl;
+    std::cout << "Sequential Cholesky, N = " << N << std::endl;
     std::cout << "Milliseconds: " << count << std::endl;
     std::cout << "Percent residual (Frobenius): " << frobFractional << std::endl;
     std::cout << "---------------------------" << std::endl;
