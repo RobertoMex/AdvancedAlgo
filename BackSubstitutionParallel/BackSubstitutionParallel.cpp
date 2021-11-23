@@ -24,28 +24,36 @@
  * @param resultVec The result vector
  */
 template <typename TScalar, std::size_t N, std::size_t NBlock>
-void backSubBlockIter(std::size_t blockIndex, Matrix<TScalar, NBlock, N> mat, Matrix<TScalar, NBlock, 1> rhs, MessageQueue<TScalar> &messageQueue, bool populateResultVec, Matrix<TScalar, N, 1> &resultVec)
+void backSubBlockIter(std::size_t blockIndex, Matrix<TScalar, NBlock, N> mat, Matrix<TScalar, NBlock, 1> rhs, MessageQueue<Matrix<TScalar, NBlock, 1>> &messageQueue, bool populateResultVec, Matrix<TScalar, N, 1> &resultVec)
 {
-    Client<TScalar> client = messageQueue.getClient();
+    Client<Matrix<TScalar, NBlock, 1>> client = messageQueue.getClient();
     std::size_t firstIdx = NBlock * blockIndex;
-    std::size_t lastIdx = (NBlock * (blockIndex + 1)) - 1;
+    std::size_t p = N / NBlock;
     Matrix<TScalar, NBlock, 1> subcolumn([mat, rhs, firstIdx](std::size_t rowIdx, std::size_t colIdx)
                                          { return rhs.get(rowIdx, 0) / mat.get(rowIdx, rowIdx + firstIdx); });
 
-    for (std::size_t i = 0; i != N - 1 - lastIdx; ++i)
+    for (std::size_t k = 0; k != p - 1 - blockIndex; ++k)
     {
-        std::size_t idx = N - 1 - i;
+        std::size_t incomingBlockIndex = p - 1 - k;
+        std::size_t incomingFirstIdx = NBlock * incomingBlockIndex;
+
         while (!messageQueue.hasNext(client))
         {
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
+            std::this_thread::sleep_for(std::chrono::microseconds(10));
         }
 
-        TScalar val = messageQueue.next(client);
-        for (std::size_t j = 0; j != NBlock; ++j)
+        Matrix<TScalar, NBlock, 1> values = messageQueue.next(client);
+
+        for (std::size_t i = 0; i != NBlock; ++i)
         {
-            TScalar cur = subcolumn.get(j, 0);
-            TScalar update = val * mat.get(j, idx) / mat.get(j, j + firstIdx);
-            subcolumn.set(j, 0, cur - update);
+            TScalar val = values.get(i, 0);
+            std::size_t valIdx = incomingFirstIdx + i;
+            for (std::size_t j = 0; j != NBlock; ++j)
+            {
+                TScalar cur = subcolumn.get(j, 0);
+                TScalar update = val * mat.get(j, valIdx) / mat.get(j, j + firstIdx);
+                subcolumn.set(j, 0, cur - update);
+            }
         }
     }
 
@@ -62,11 +70,12 @@ void backSubBlockIter(std::size_t blockIndex, Matrix<TScalar, NBlock, N> mat, Ma
         {
             resultVec.set(idx + firstIdx, 0, nextVal);
         }
-        else
-        {
-            messageQueue.enqueue(nextVal, client);
-        }
         subcolumn.set(idx, 0, nextVal);
+    }
+
+    if (!populateResultVec)
+    {
+        messageQueue.enqueue(subcolumn, client);
     }
 }
 
@@ -74,7 +83,7 @@ template <typename TScalar, std::size_t N>
 void computeBackSubstitutionSequential(const Matrix<TScalar, N, N> &mat, const Matrix<TScalar, N, 1> &rhs, Matrix<TScalar, N, 1> &result)
 {
     auto timerStart = std::chrono::steady_clock::now();
-    MessageQueue<TScalar> messageQueue;
+    MessageQueue<Matrix<TScalar, N, 1>> messageQueue;
     backSubBlockIter<TScalar, N, N>(0, mat, rhs, messageQueue, true, result);
     auto timerStop = std::chrono::steady_clock::now();
     std::chrono::duration<double> milliseconds = timerStop - timerStart;
@@ -97,8 +106,8 @@ void computeBackSubstitutionSequential(const Matrix<TScalar, N, N> &mat, const M
 template <typename TScalar, std::size_t N, std::size_t NBlock>
 void computeBackSubstitutionParallel(const Matrix<TScalar, N, N> &mat, const Matrix<TScalar, N, 1> &rhs, Matrix<TScalar, N, 1> &result)
 {
-    MessageQueue<TScalar> messageQueue;
-    Client<TScalar> client = messageQueue.getClient();
+    MessageQueue<Matrix<TScalar, NBlock, 1>> messageQueue;
+    Client<Matrix<TScalar, NBlock, 1>> client = messageQueue.getClient();
     const std::size_t p = N / NBlock;
 
     auto timerStart = std::chrono::steady_clock::now();
@@ -121,16 +130,17 @@ void computeBackSubstitutionParallel(const Matrix<TScalar, N, N> &mat, const Mat
         threads[i].join();
     }
 
-    for (std::size_t i = 0; i != N; ++i)
+    for (std::size_t i = 0; i != p; ++i)
     {
+        std::size_t blockIndex = p - 1 - i;
         if (!messageQueue.hasNext(client))
         {
             std::cout << "FATAL ERROR: parallel chol alg aborted unexpectedly" << std::endl;
             return;
         }
 
-        TScalar val = messageQueue.next(client);
-        result.set(N - 1 - i, 0, val);
+        const Matrix<TScalar, NBlock, 1> values = messageQueue.next(client);
+        result.overwriteSubmatrix(values, NBlock * blockIndex, 0);
     }
 
     auto timerStop = std::chrono::steady_clock::now();
@@ -156,7 +166,7 @@ void calculateBackSubstitution(bool useParallel)
 {
     std::mt19937 rng;
     rng.seed(11828);
-    std::normal_distribution<float> normal_dist(0.0, 10.0);
+    std::normal_distribution<float> normal_dist(0.0, 1.0 / N);
     Matrix<float, N, N> mat([rng, normal_dist](std::size_t rowIdx, std::size_t colIdx) mutable
                             {
                                 if (rowIdx > colIdx)
@@ -164,10 +174,10 @@ void calculateBackSubstitution(bool useParallel)
                                     return (float)0;
                                 }
                                 float val = normal_dist(rng);
-                                return (rowIdx == colIdx) ? ((val * val) + 1) : val;
+                                return (rowIdx == colIdx) ? (val + 1) : val;
                             });
     Matrix<float, N, 1> rhs([rng, normal_dist](std::size_t rowIdx, std::size_t colIdx) mutable
-                            { return (float)(normal_dist(rng)); });
+                            { return (float)(normal_dist(rng) * N); });
     std::cout << std::endl;
     std::cout << "---------------------------" << std::endl;
     std::cout << "Matrix entry-wise sample standard deviation: " << mat.sample_dev() << std::endl;
@@ -187,7 +197,7 @@ void calculateBackSubstitution(bool useParallel)
 
 int main()
 {
-    constexpr std::size_t N = 2048;
+    constexpr std::size_t N = 8192;
     calculateBackSubstitution<N, N>(false);
     calculateBackSubstitution<N, N / 2>(true);
     calculateBackSubstitution<N, N / 4>(true);
