@@ -24,7 +24,6 @@ void populateCholMat(Matrix<TScalar, N, 1> &column /* mutated!! */, Matrix<TScal
     result.overwriteSubmatrix(column, 0, i);
 }
 
-
 /**
  * @brief Compute one block in the parallel Cholesky. The block shape is N by NBlock; NBlock must divide N.
  * 
@@ -40,8 +39,10 @@ void populateCholMat(Matrix<TScalar, N, 1> &column /* mutated!! */, Matrix<TScal
  * @tparam N Matrix size
  * @tparam NBlock Number of columns in this block. Must divide N.
  * @param blockIndex The zero-based index of this block (left to right).
- * @param mat Should be initialized with the corresponding block of the matrix A.
+ * @param mat Should be initialized with the corresponding block of the (symmetric positive definite) matrix A.
  * @param messageQueue The queue for communication across threads.
+ * @param populateResultMat Whether to skip messaging and simply populate the result matrix for this block (for sequential solve).
+ * @param resultMat The result matrix
  */
 template <typename TScalar, std::size_t N, std::size_t NBlock>
 void cholBlockIter(std::size_t blockIndex, Matrix<TScalar, N, NBlock> mat, MessageQueue<Matrix<TScalar, N, 1>> &messageQueue, bool populateResultMat, Matrix<TScalar, N, N> &resultMat)
@@ -75,7 +76,10 @@ void cholBlockIter(std::size_t blockIndex, Matrix<TScalar, N, NBlock> mat, Messa
         {
             column.set(j, 0, 0);
         }
-        messageQueue.enqueue(column, client);
+        if (!populateResultMat)
+        {
+            messageQueue.enqueue(column, client);
+        }
         const TScalar diagElem = column.get(i + firstIdx, 0);
         column.set(i + firstIdx, 0, 0);
         Matrix<TScalar, N, NBlock> outerProduct;
@@ -197,7 +201,9 @@ void calculateCholesky(bool useParallel)
     if (useParallel)
     {
         computeCholeskyParallel<float, N, NBlock>(mat, result);
-    } else {
+    }
+    else
+    {
         computeCholeskySequential<float, N>(mat, result);
     }
     std::cout << std::endl;
@@ -205,11 +211,9 @@ void calculateCholesky(bool useParallel)
 
 int main()
 {
-    calculateCholesky<2048, 2048>(false);
-    calculateCholesky<2048, 1024>(true);
-    calculateCholesky<2048, 512>(true);
-    calculateCholesky<2048, 256>(true);
-    calculateCholesky<2048, 128>(true);
-    calculateCholesky<2048, 64>(true);
+    constexpr std::size_t N = 4096;
+    calculateCholesky<N, N>(false);
+    calculateCholesky<N, N / 2>(true);
+    calculateCholesky<N, N / 4>(true);
+    calculateCholesky<N, N / 8>(true);
 }
-
