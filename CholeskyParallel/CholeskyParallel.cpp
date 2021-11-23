@@ -211,7 +211,7 @@ void calculateCholesky(bool useParallel)
 
 int main()
 {
-    constexpr std::size_t N = 4096;
+    constexpr std::size_t N = 1024;
     calculateCholesky<N, N>(false);
     calculateCholesky<N, N / 2>(true);
     calculateCholesky<N, N / 4>(true);
