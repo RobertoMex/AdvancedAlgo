@@ -32,18 +32,19 @@ void backSubBlockIter(std::size_t blockIndex, Matrix<TScalar, NBlock, N> mat, Ma
     Matrix<TScalar, NBlock, 1> subcolumn([mat, rhs, firstIdx](std::size_t rowIdx, std::size_t colIdx)
                                          { return rhs.get(rowIdx, 0) / mat.get(rowIdx, rowIdx + firstIdx); });
 
-    for (std::size_t i = N - 1; i != lastIdx; --i)
+    for (std::size_t i = 0; i != N - 1 - lastIdx; ++i)
     {
+        std::size_t idx = N - 1 - i;
         while (!messageQueue.hasNext(client))
         {
-            std::this_thread::sleep_for(std::chrono::microseconds(10));
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
 
         TScalar val = messageQueue.next(client);
         for (std::size_t j = 0; j != NBlock; ++j)
         {
             TScalar cur = subcolumn.get(j, 0);
-            TScalar update = val * mat.get(j, i) / mat.get(j, j + firstIdx);
+            TScalar update = val * mat.get(j, idx) / mat.get(j, j + firstIdx);
             subcolumn.set(j, 0, cur - update);
         }
     }
@@ -52,7 +53,7 @@ void backSubBlockIter(std::size_t blockIndex, Matrix<TScalar, NBlock, N> mat, Ma
     {
         std::size_t idx = NBlock - 1 - i;
         TScalar nextVal = subcolumn.get(idx, 0);
-        for (std::size_t j = idx + 1; j < NBlock; ++j)
+        for (std::size_t j = idx + 1; j != NBlock; ++j)
         {
             TScalar update = subcolumn.get(j, 0) * mat.get(idx, j + firstIdx) / mat.get(idx, idx + firstIdx);
             nextVal -= update;
@@ -74,7 +75,7 @@ void computeBackSubstitutionSequential(const Matrix<TScalar, N, N> &mat, const M
 {
     auto timerStart = std::chrono::steady_clock::now();
     MessageQueue<TScalar> messageQueue;
-    backSubBlockIter<TScalar>(0, mat, rhs, messageQueue, true, result);
+    backSubBlockIter<TScalar, N, N>(0, mat, rhs, messageQueue, true, result);
     auto timerStop = std::chrono::steady_clock::now();
     std::chrono::duration<double> milliseconds = timerStop - timerStart;
     int count = 1000 * milliseconds.count();
@@ -83,8 +84,8 @@ void computeBackSubstitutionSequential(const Matrix<TScalar, N, N> &mat, const M
     mat.multiplyRight(result, computed);
     computed.add(rhs, -1.0);
     TScalar frobResidual = computed.frobNorm();
-    TScalar frobMat = mat.frobNorm();
-    TScalar frobFractional = 100.0 * frobResidual / frobMat;
+    TScalar frobRhs = rhs.frobNorm();
+    TScalar frobFractional = 100.0 * frobResidual / frobRhs;
 
     std::cout << "Sequential Back Substitution, N = " << N << std::endl;
     std::cout << "Milliseconds: " << count << std::endl;
@@ -140,8 +141,8 @@ void computeBackSubstitutionParallel(const Matrix<TScalar, N, N> &mat, const Mat
     mat.multiplyRight(result, computed);
     computed.add(rhs, -1.0);
     TScalar frobResidual = computed.frobNorm();
-    TScalar frobMat = mat.frobNorm();
-    TScalar frobFractional = 100.0 * frobResidual / frobMat;
+    TScalar frobRhs = rhs.frobNorm();
+    TScalar frobFractional = 100.0 * frobResidual / frobRhs;
 
     std::cout << "Parallel Back Substitution, N = " << N << ", p = " << p << std::endl;
     std::cout << "Milliseconds: " << count << std::endl;
