@@ -1,0 +1,46 @@
+
+
+// One RHS
+
+---------------------------
+Matrix entry-wise sample standard deviation: 0.0110472
+RHS entry-wise sample standard deviation: 0.990711
+---------------------------
+Sequential Back Substitution, N = 8192
+Milliseconds: 826
+Percent residual (Frobenius): 0.000118648
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 0.0110472
+RHS entry-wise sample standard deviation: 0.990711
+---------------------------
+Parallel Back Substitution, N = 8192, p = 2
+Milliseconds: 1522
+Percent residual (Frobenius): 0.000118768
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 0.0110472
+RHS entry-wise sample standard deviation: 0.990711
+---------------------------
+Parallel Back Substitution, N = 8192, p = 4
+Milliseconds: 1334
+Percent residual (Frobenius): 0.000118436
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 0.0110472
+RHS entry-wise sample standard deviation: 0.990711
+---------------------------
+Parallel Back Substitution, N = 8192, p = 8
+Milliseconds: 1130
+Percent residual (Frobenius): 0.000118474
+---------------------------
+

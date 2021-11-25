@@ -4,35 +4,29 @@
 #include <list>
 #include <shared_mutex>
 #include <mutex>
-#include "Client.hpp"
 #include "MessageQueueItem.hpp"
+
+template <typename TMessage>
+class Client;
 
 template <typename TMessage>
 class MessageQueue
 {
 private:
     std::list<MessageQueueItem<TMessage>> list{};
-    mutable std::shared_mutex mutex;
-    mutable std::size_t nextClientId = 0;
-
-    void advance(const Client<TMessage> &client)
-    {
-        auto crbeg = list.crbegin();
-        for (auto &rit = client.rit; rit != crbeg; ++rit)
-        {
-            MessageQueueItem<TMessage> message = *rit;
-            if (!message.consumed && message.clientId != client.clientId)
-            {
-                break;
-            }
-        }
-    };
+    std::shared_mutex mutex;
+    std::size_t nextClientId = 0;
 
 public:
-    const Client<TMessage> getClient() const
+    MessageQueue()
+    {
+        list.emplace_back(TMessage(), -1);
+    }
+
+    Client<TMessage> getClient()
     {
         std::unique_lock lock(mutex);
-        const Client<TMessage> client(nextClientId, list.crend());
+        Client<TMessage> client(nextClientId, list.begin());
         ++nextClientId;
         return client;
     };
@@ -40,33 +34,64 @@ public:
     void enqueue(const TMessage content, const Client<TMessage> &client)
     {
         std::unique_lock lock(mutex);
-        list.push_front(MessageQueueItem(content, client.clientId));
+        list.emplace_back(content, client.clientId);
     };
 
-    bool hasNext(Client<TMessage> &client) const
+    bool hasNext(Client<TMessage> &client)
     {
         std::shared_lock lock(mutex);
-        advance(client);
-        if (client.rit == list.crend())
+        if (list.empty())
         {
             return false;
         }
-        MessageQueueItem<TMessage> message = *client.rit;
-        return (!message.consumed && message.clientId != client.clientId);
+        return client.hasNext(list.begin(), list.end());
     };
 
-    const TMessage next(Client<TMessage> &client) const
+    const TMessage next(Client<TMessage> &client)
     {
         std::shared_lock lock(mutex);
-        advance(client);
-        if (client.rit == list.crend())
+        if (list.empty())
         {
             return TMessage();
         }
-        MessageQueueItem<TMessage> message = *client.rit;
-        message.consumed = true;
-        return message.content;
+        return client.consume(list.begin(), list.end());
     };
+};
+
+template <typename TMessage>
+class Client
+{
+    friend class MessageQueue<TMessage>;
+
+private:
+    std::size_t clientId;
+    typename std::list<MessageQueueItem<TMessage>>::iterator it;
+    bool consumed = true;
+
+    void advance(typename std::list<MessageQueueItem<TMessage>>::iterator beg, typename std::list<MessageQueueItem<TMessage>>::iterator end)
+    {
+        while (consumed && std::next(it) != end)
+        {
+            ++it;
+            consumed = (it->clientId == clientId);
+        }
+    };
+
+    const TMessage consume(typename std::list<MessageQueueItem<TMessage>>::iterator beg, typename std::list<MessageQueueItem<TMessage>>::iterator end)
+    {
+        advance(beg, end);
+        consumed = true;
+        return it->content;
+    };
+
+    bool hasNext(typename std::list<MessageQueueItem<TMessage>>::iterator beg, typename std::list<MessageQueueItem<TMessage>>::iterator end)
+    {
+        advance(beg, end);
+        return !consumed;
+    };
+
+public:
+    Client(std::size_t clientId, typename std::list<MessageQueueItem<TMessage>>::iterator it) : clientId(clientId), it(it){};
 };
 
 #endif

@@ -1,8 +1,9 @@
 #ifndef MATRIXHPP
 #define MATRIXHPP
 
-#include <array>
+#include <vector>
 #include <functional>
+#include <cmath>
 
 /**
  * @brief A numerical matrix class with compile-time shape specified.
@@ -22,21 +23,14 @@ class Matrix
     friend class Matrix;
 
 private:
-    std::array<std::array<TScalar, NCols>, NRows> mat{};
+    std::vector<std::vector<TScalar>> mat;
 
 public:
-    Matrix(TScalar defaultValue)
-    {
-        for (auto &row : mat)
-        {
-            for (auto &entry : row)
-            {
-                entry = defaultValue;
-            }
-        }
-    };
+    Matrix() : mat(std::vector<std::vector<TScalar>>(NRows, std::vector<TScalar>(NCols, 0))){};
 
-    Matrix(std::function<TScalar(std::size_t row, std::size_t col)> fun)
+    Matrix(TScalar defaultValue) : mat(std::vector<std::vector<TScalar>>(NRows, std::vector<TScalar>(NCols, defaultValue))){};
+
+    Matrix(std::function<TScalar(std::size_t row, std::size_t col)> fun) : mat(std::vector<std::vector<TScalar>>(NRows, std::vector<TScalar>(NCols)))
     {
         for (std::size_t i = 0; i != NRows; ++i)
         {
@@ -49,9 +43,17 @@ public:
 
     Matrix<TScalar, NCols, NRows> transpose() const
     {
-        return Matrix<TScalar, NCols, NRows>([this](std::size_t i, std::size_t j)
-                                             { return mat[j][i]; });
-    }
+        Matrix<TScalar, NCols, NRows> transpose(0);
+        std::vector<std::vector<TScalar>> &transposeMat = transpose.mat;
+        for (std::size_t i = 0; i < NRows; ++i)
+        {
+            for (std::size_t j = 0; j < NCols; ++j)
+            {
+                transposeMat[j][i] = mat[i][j];
+            }
+        }
+        return transpose;
+    };
 
     void print() const
     {
@@ -74,7 +76,19 @@ public:
     TScalar get(std::size_t i, std::size_t j) const
     {
         return mat[i][j];
-    }
+    };
+
+    /**
+     * @brief Set an entry of the matrix; there is no bounds checking.
+     * 
+     * @param i Row index: 0 <= i < NRows
+     * @param j Col index: 0 <= j < NCols
+     * @param value The value to write
+     */
+    void set(std::size_t i, std::size_t j, TScalar value)
+    {
+        mat[i][j] = value;
+    };
 
     /**
      * @brief Add a scalar times another matrix to the current matrix.
@@ -84,11 +98,12 @@ public:
      */
     void add(const Matrix<TScalar, NRows, NCols> &other, TScalar scalar)
     {
+        const std::vector<std::vector<TScalar>> &otherMat = other.mat;
         for (std::size_t i = 0; i != NRows; ++i)
         {
             for (std::size_t j = 0; j != NCols; ++j)
             {
-                mat[i][j] += scalar * other.mat[i][j];
+                mat[i][j] += scalar * otherMat[i][j];
             }
         }
     };
@@ -119,13 +134,15 @@ public:
     template <std::size_t NColsProduct>
     void multiplyRight(const Matrix<TScalar, NCols, NColsProduct> &other, Matrix<TScalar, NRows, NColsProduct> &result) const
     {
+        const std::vector<std::vector<TScalar>> &otherMat = other.mat;
+        std::vector<std::vector<TScalar>> &resultMat = result.mat;
         for (std::size_t i = 0; i != NRows; ++i)
         {
             for (std::size_t k = 0; k != NCols; ++k)
             {
                 for (std::size_t j = 0; j != NColsProduct; ++j)
                 {
-                    result.mat[i][j] += mat[i][k] * other.mat[k][j];
+                    resultMat[i][j] += mat[i][k] * otherMat[k][j];
                 }
             }
         }
@@ -141,13 +158,15 @@ public:
     template <std::size_t NRowsProduct>
     void multiplyLeft(const Matrix<TScalar, NRowsProduct, NRows> &other, Matrix<TScalar, NRowsProduct, NCols> &result) const
     {
+        const std::vector<std::vector<TScalar>> &otherMat = other.mat;
+        std::vector<std::vector<TScalar>> &resultMat = result.mat;
         for (std::size_t i = 0; i != NRowsProduct; ++i)
         {
             for (std::size_t k = 0; k != NRows; ++k)
             {
                 for (std::size_t j = 0; j != NCols; ++j)
                 {
-                    result.mat[i][j] += other.mat[i][k] * mat[k][j];
+                    resultMat[i][j] += otherMat[i][k] * mat[k][j];
                 }
             }
         }
@@ -165,8 +184,104 @@ public:
     template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
     Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> submatrix(std::size_t firstRow, std::size_t firstCol) const
     {
-        return Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix>([this, firstRow, firstCol](std::size_t i, std::size_t j)
-                                                               { return mat[firstRow + i][firstCol + j]; });
+        Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> result(0);
+        std::vector<std::vector<TScalar>> &resultMat = result.mat;
+        for (std::size_t i = 0; i < NRowsSubmatrix; ++i)
+        {
+            for (std::size_t j = 0; j < NColsSubmatrix; ++j)
+            {
+                resultMat[i][j] = mat[firstRow + i][firstCol + j];
+            }
+        }
+        return result;
+    };
+
+    /**
+     * @brief Return a copy of a column of the current matrix. There is no bounds checking.
+     * 
+     * @param colIdx The column index.
+     * @return Matrix<TScalar, NRows, 1> The column.
+     */
+    Matrix<TScalar, NRows, 1> column(std::size_t colIdx) const
+    {
+        return submatrix<NRows, 1>(0, colIdx);
+    };
+
+    /**
+     * @brief Return a submatrix consisting of columns of the current matrix. There is no bounds checking.
+     * 
+     * @tparam NColsSubmatrix The number of columns to return.
+     * @param firstCol The first column of the submatrix.
+     * @return Matrix<TScalar, NRows, NColsSubmatrix> The submatrix.
+     */
+    template <std::size_t NColsSubmatrix>
+    Matrix<TScalar, NRows, NColsSubmatrix> columns(std::size_t firstCol)
+    {
+        return submatrix<NRows, NColsSubmatrix>(0, firstCol);
+    };
+
+    /**
+     * @brief Overwrite columns of the target matrix with columns of the current matrix. There is no bounds checking.
+     * 
+     * @tparam NColsSubmatrix The number of columns of the target.
+     * @param firstCol The first column index of the current matrix.
+     * @param target The target matrix.
+     */
+    template <std::size_t NColsSubmatrix>
+    void columnsInto(std::size_t firstCol, Matrix<TScalar, NRows, NColsSubmatrix> &target) const
+    {
+        std::vector<std::vector<TScalar>> &targetMat = target.mat;
+        for (std::size_t i = 0; i < NRows; ++i)
+        {
+            for (std::size_t j = 0; j < NColsSubmatrix; ++j)
+            {
+                targetMat[i][j] = mat[i][firstCol + j];
+            }
+        }
+    };
+
+    /**
+     * @brief Overwrite rows of the target matrix with rows of the current matrix. There is no bounds checking.
+     * 
+     * @tparam NRowsSubmatrix The number of rows of the target.
+     * @param firstRow The first row index of the current matrix.
+     * @param target The target matrix.
+     */
+    template <std::size_t NRowsSubmatrix>
+    void rowsInto(std::size_t firstRow, Matrix<TScalar, NRowsSubmatrix, NCols> &target) const
+    {
+        std::vector<std::vector<TScalar>> &targetMat = target.mat;
+        for (std::size_t i = 0; i < NRowsSubmatrix; ++i)
+        {
+            for (std::size_t j = 0; j < NCols; ++j)
+            {
+                targetMat[i][j] = mat[i + firstRow][j];
+            }
+        }
+    };
+
+    /**
+     * @brief Return a copy of a row of the current matrix. There is no bounds checking.
+     * 
+     * @param colIdx The row index.
+     * @return Matrix<TScalar, 1, NCols> The row.
+     */
+    Matrix<TScalar, 1, NCols> row(std::size_t rowIdx) const
+    {
+        return submatrix<1, NCols>(rowIdx, 0);
+    };
+
+    /**
+     * @brief Return a submatrix consisting of rows of the current matrix. There is no bounds checking.
+     * 
+     * @tparam NRowsSubmatrix The number of rows to return.
+     * @param firstCol The first row of the submatrix.
+     * @return Matrix<TScalar, NRowsSubmatrix, NCols> The submatrix.
+     */
+    template <std::size_t NRowsSubmatrix>
+    Matrix<TScalar, NRowsSubmatrix, NCols> rows(std::size_t firstRow)
+    {
+        return submatrix<NRowsSubmatrix, NCols>(firstRow, 0);
     };
 
     /**
@@ -181,13 +296,86 @@ public:
     template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
     void overwriteSubmatrix(const Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> &other, std::size_t firstRow, std::size_t firstCol)
     {
+        const std::vector<std::vector<TScalar>> &otherMat = other.mat;
         for (std::size_t i = 0; i != NRowsSubmatrix; ++i)
         {
             for (std::size_t j = 0; j != NColsSubmatrix; ++j)
             {
-                mat[firstRow + i][firstCol + j] = other.mat[i][j];
+                mat[firstRow + i][firstCol + j] = otherMat[i][j];
             }
         }
+    };
+
+    /**
+     * @brief Add to a submatrix of the current matrix a constant multiple of another matrix. There is no bounds checking.
+     * 
+     * @tparam NRowsSubmatrix The number of rows of the submatrix.
+     * @tparam NColsSubmatrix The number of columns of the submatrix.
+     * @param other A matrix containing the new values to add to the submatrix of the current matrix.
+     * @param firstRow The index of the first row of the submatrix: we must have (firstRow + NRowsSubmatrix) less than NRows.
+     * @param firstCol The index of the first column of the submatrix: we must have (firstCol + NColsSubmatrix) less than NCols.
+     * @param scalar A scalar multiple.
+     */
+    template <std::size_t NRowsSubmatrix, std::size_t NColsSubmatrix>
+    void addToSubmatrix(const Matrix<TScalar, NRowsSubmatrix, NColsSubmatrix> &other, std::size_t firstRow, std::size_t firstCol, TScalar scalar)
+    {
+        const std::vector<std::vector<TScalar>> &otherMat = other.mat;
+        for (std::size_t i = 0; i != NRowsSubmatrix; ++i)
+        {
+            for (std::size_t j = 0; j != NColsSubmatrix; ++j)
+            {
+                mat[firstRow + i][firstCol + j] += scalar * otherMat[i][j];
+            }
+        }
+    };
+
+    /**
+     * @brief Return a quantity proportional to the Frobenius norm (element-wise 2-norm) of the current matrix.
+     * 
+     * @return TScalar The computed norm.
+     */
+    TScalar frobNorm() const
+    {
+        TScalar sum = 0;
+        for (std::size_t i = 0; i != NRows; ++i)
+        {
+            for (std::size_t j = 0; j != NCols; ++j)
+            {
+                TScalar elem = mat[i][j];
+                sum += elem * elem / (NRows * NCols);
+            }
+        }
+
+        return std::sqrt(std::abs(sum));
+    };
+
+    /**
+     * @brief Compute the biased sample variance of the entries of the current matrix
+     * 
+     * @return The sample variance
+     */
+    TScalar sample_dev() const
+    {
+        TScalar mean = 0;
+        for (std::size_t i = 0; i != NRows; ++i)
+        {
+            for (std::size_t j = 0; j != NCols; ++j)
+            {
+                mean += mat[i][j] / (NRows * NCols);
+            }
+        }
+
+        TScalar variance = 0;
+        for (std::size_t i = 0; i != NRows; ++i)
+        {
+            for (std::size_t j = 0; j != NCols; ++j)
+            {
+                TScalar diff = mat[i][j] - mean;
+                variance += diff * diff / (NRows * NCols);
+            }
+        }
+
+        return std::sqrt(std::abs(variance));
     };
 };
 

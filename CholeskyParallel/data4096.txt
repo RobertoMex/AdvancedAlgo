@@ -1,0 +1,38 @@
+---------------------------
+Matrix entry-wise sample standard deviation: 2.17247
+---------------------------
+Sequential Cholesky, N = 4096
+Milliseconds: 1210814
+Percent residual (Frobenius): 9.15056e-05
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 2.17247
+---------------------------
+Parallel Cholesky, N = 4096, p = 2
+Milliseconds: 693141
+Percent residual (Frobenius): 9.15056e-05
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 2.17247
+---------------------------
+Parallel Cholesky, N = 4096, p = 4
+Milliseconds: 375598
+Percent residual (Frobenius): 9.15056e-05
+---------------------------
+
+
+
+---------------------------
+Matrix entry-wise sample standard deviation: 2.17247
+---------------------------
+Parallel Cholesky, N = 4096, p = 8
+Milliseconds: 269707
+Percent residual (Frobenius): 9.15056e-05
+---------------------------
+
