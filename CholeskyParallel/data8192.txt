@@ -1,4 +1,15 @@
 
+// Cholesky
+
+---------------------------
+Matrix entry-wise sample standard deviation: 1.42047
+---------------------------
+Parallel Cholesky, N = 8192, p = 2
+Milliseconds: 5510485
+Percent residual (Frobenius): 0.000134294
+---------------------------
+
+
 
 ---------------------------
 Matrix entry-wise sample standard deviation: 1.42047
